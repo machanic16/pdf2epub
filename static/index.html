@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF to EPUB</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='5' y='3' width='22' height='26' rx='3' fill='%23b4532a'/><path d='M10 10h12M10 15h12M10 20h8' stroke='%23fff' stroke-width='2' stroke-linecap='round'/></svg>">
+<style>
+  :root {
+    --bg: #f6f1e8; --card: #fffdf8; --ink: #2b2420; --muted: #7a6e64; --line: #e4dacb;
+    --accent: #b4532a; --accent-soft: #f3e1d4; --ok: #3f7d4e; --ok-soft: #e1efe3; --err: #b23b3b; --err-soft: #f6e0df;
+    --shadow: 0 1px 2px rgba(60,40,20,.06), 0 8px 30px rgba(60,40,20,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1916; --card: #26221e; --ink: #efe7dc; --muted: #a59a8e; --line: #3a342e;
+      --accent: #e07a4b; --accent-soft: #3d2a20; --ok: #7cc28d; --ok-soft: #1f3324; --err: #ec8a8a; --err-soft: #3d2222;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 30px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 56px 16px 64px; }
+  header { text-align: center; margin-bottom: 32px; }
+  h1 { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+       font-weight: 600; font-size: clamp(2rem, 6vw, 2.75rem); margin: 0 0 6px; letter-spacing: -.01em; }
+  h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); }
+
+  .drop { position: relative; display: block; background: var(--card); border: 2px dashed var(--line);
+          border-radius: 18px; padding: 48px 24px; text-align: center; cursor: pointer;
+          box-shadow: var(--shadow); transition: border-color .15s, background .15s, transform .15s; }
+  .drop:hover, .drop:focus-within { border-color: var(--accent); }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.01); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop svg { width: 56px; height: 56px; color: var(--accent); margin-bottom: 12px; }
+  .drop strong { display: block; font-size: 1.15rem; margin-bottom: 4px; }
+  .drop small { color: var(--muted); }
+  .btn { display: inline-block; margin-top: 16px; padding: 9px 20px; border-radius: 999px;
+         background: var(--accent); color: #fff; font-weight: 600; font-size: .95rem; }
+
+  details { margin-top: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  summary { cursor: pointer; padding: 14px 18px; font-weight: 600; list-style: none; display: flex; align-items: center; gap: 8px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "›"; display: inline-block; transition: transform .15s; color: var(--muted); font-size: 1.2rem; line-height: 1; }
+  details[open] summary::before { transform: rotate(90deg); }
+  summary em { font-style: normal; font-weight: 400; color: var(--muted); font-size: .9rem; }
+  .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 18px 18px; }
+  .opts label { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); }
+  .opts .full { grid-column: 1 / -1; }
+  .opts input[type=text], .opts select { font: inherit; color: var(--ink); background: var(--bg);
+         border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; }
+  .opts input:focus, .opts select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .opts .check { flex-direction: row; align-items: center; gap: 9px; color: var(--ink); font-size: .95rem; }
+  .opts .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .hint { font-size: .78rem; color: var(--muted); }
+  .cover-opt .lbl { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg label { cursor: pointer; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px;
+              background: var(--bg); color: var(--ink); font-size: .9rem; transition: all .15s; }
+  .seg input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cover-pick { display: flex; gap: 16px; align-items: flex-start; margin-top: 14px; }
+  .thumb { position: relative; flex: none; width: 104px; height: 150px; border: 2px dashed var(--line); border-radius: 8px;
+           background: var(--bg); display: grid; place-items: center; text-align: center; font-size: .72rem;
+           color: var(--muted); cursor: pointer; overflow: hidden; transition: border-color .15s; }
+  .thumb:hover, .thumb.over { border-color: var(--accent); }
+  .thumb.has { border-style: solid; box-shadow: var(--shadow); }
+  .thumb input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cover-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-top: 4px; }
+  #coverName { font-weight: 600; font-size: .9rem; word-break: break-word; }
+  .link { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--accent);
+          font: inherit; font-size: .85rem; cursor: pointer; text-decoration: underline; }
+
+  #list { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 10px; }
+  .item { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line);
+          border-radius: 14px; padding: 14px 16px; animation: in .25s ease-out; }
+  @keyframes in { from { opacity: 0; transform: translateY(6px); } }
+  .icon { flex: none; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+          background: var(--accent-soft); color: var(--accent); }
+  .item.done .icon { background: var(--ok-soft); color: var(--ok); }
+  .item.error .icon { background: var(--err-soft); color: var(--err); }
+  .icon svg { width: 20px; height: 20px; }
+  .meta { flex: 1; min-width: 0; }
+  .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { font-size: .85rem; color: var(--muted); }
+  .item.error .status { color: var(--err); }
+  .bar { height: 4px; background: var(--line); border-radius: 4px; margin-top: 7px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .bar.busy i { width: 35%; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+  .dl { flex: none; padding: 8px 14px; border-radius: 999px; background: var(--ok); color: #fff;
+        font-weight: 600; font-size: .85rem; text-decoration: none; }
+  .spin { animation: rot 1s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; color: var(--muted); font-size: .82rem; margin-top: 40px; }
+  @media (max-width: 520px) { main { padding-top: 32px; } .opts { grid-template-columns: 1fr; } .drop { padding: 36px 16px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>PDF <span>→</span> EPUB</h1>
+    <p>Turn PDF books into reflowable ebooks for Kindle, Kobo and Apple Books.</p>
+  </header>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5V5a2 2 0 0 1 2-2h9l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19.5Z"/><path d="M14 3v5h5"/>
+      <path d="M12 17v-6"/><path d="m9 13.5 3-3 3 3"/>
+    </svg>
+    <strong>Drop your PDFs here</strong>
+    <small>or click to choose files. Each EPUB downloads automatically when it's ready.</small><br>
+    <span class="btn">Choose PDFs</span>
+  </label>
+
+  <details>
+    <summary>Options <em>(optional)</em></summary>
+    <div class="opts">
+      <label>Title <input type="text" id="title" placeholder="From the PDF"></label>
+      <label>Author <input type="text" id="author" placeholder="From the PDF"></label>
+      <label>Language
+        <select id="lang">
+          <option value="">Detect automatically</option>
+          <option value="es">Spanish</option><option value="en">English</option>
+          <option value="fr">French</option><option value="pt">Portuguese</option>
+          <option value="de">German</option><option value="it">Italian</option>
+        </select>
+      </label>
+      <label>Pages to leave out <input type="text" id="skip" placeholder="e.g. 1-4, 651-656"></label>
+      <div class="full cover-opt">
+        <span class="lbl">Cover</span>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="cover" value="page" checked><span>First page of the PDF</span></label>
+          <label><input type="radio" name="cover" value="image"><span>Upload an image</span></label>
+          <label><input type="radio" name="cover" value="none"><span>No cover</span></label>
+        </div>
+        <div class="cover-pick" id="coverPick" hidden>
+          <label class="thumb" id="thumb">
+            <input type="file" id="coverFile" accept="image/jpeg,image/png">
+            <img id="coverImg" alt="" hidden>
+            <span id="thumbTxt">Choose a JPEG or PNG,<br>or drop it here</span>
+          </label>
+          <div class="cover-info">
+            <div id="coverName">No image chosen</div>
+            <span class="hint">The image becomes the book's cover. Page 1 stays in the book; add it to "Pages to leave out" if it's the printed cover.</span>
+            <button type="button" class="link" id="coverClear" hidden>Remove image</button>
+          </div>
+        </div>
+      </div>
+      <span class="hint full">Title, author and cover apply to every file in the batch, so leave them empty when converting several books at once.</span>
+    </div>
+  </details>
+
+  <ul id="list"></ul>
+
+  <footer>Works with PDFs that have selectable text. Scanned books need OCR first.</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const drop = $('drop'), input = $('file'), list = $('list');
+const ICON = {
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Zm0 0A2 2 0 0 0 6 21h12"/></svg>',
+  spin: '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+  ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>',
+  err:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>',
+};
+const fmtSize = b => b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+
+['dragenter', 'dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => handle(ev.dataTransfer.files));
+input.addEventListener('change', () => { handle(input.files); input.value = ''; });
+// dropping outside the box shouldn't open the PDF in the browser
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+// ---- cover image
+let coverImage = null;
+const thumb = $('thumb'), coverFile = $('coverFile'), coverImg = $('coverImg');
+document.querySelectorAll('input[name=cover]').forEach(r => r.addEventListener('change', () => {
+  $('coverPick').hidden = document.querySelector('input[name=cover]:checked').value !== 'image';
+}));
+function setCover(f) {
+  if (f && !/^image\/(jpeg|png)$/.test(f.type)) { $('coverName').textContent = 'Please choose a JPEG or PNG image'; return; }
+  coverImage = f || null;
+  if (coverImg.src) URL.revokeObjectURL(coverImg.src);
+  coverImg.hidden = !f; $('thumbTxt').hidden = !!f; thumb.classList.toggle('has', !!f);
+  $('coverClear').hidden = !f;
+  if (f) coverImg.src = URL.createObjectURL(f); else coverImg.removeAttribute('src');
+  $('coverName').textContent = f ? f.name : 'No image chosen';
+}
+coverFile.addEventListener('change', () => { setCover(coverFile.files[0]); coverFile.value = ''; });
+$('coverClear').addEventListener('click', () => setCover(null));
+['dragenter', 'dragover'].forEach(e => thumb.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); thumb.classList.add('over'); }));
+['dragleave', 'drop'].forEach(e => thumb.addEventListener(e, ev => { ev.preventDefault(); ev.stopPropagation(); thumb.classList.remove('over'); }));
+thumb.addEventListener('drop', ev => setCover(ev.dataTransfer.files[0]));
+
+let queue = Promise.resolve();
+function handle(files) {
+  for (const f of files) {
+    const row = addRow(f);
+    if (!/\.pdf$/i.test(f.name)) { setState(row, 'error', 'Not a PDF file'); continue; }
+    if (document.querySelector('input[name=cover]:checked').value === 'image' && !coverImage) {
+      setState(row, 'error', 'Choose a cover image in Options, or pick another cover setting'); continue;
+    }
+    queue = queue.then(() => convert(f, row));   // one at a time keeps the mini PC responsive
+  }
+}
+
+function addRow(f) {
+  const li = document.createElement('li');
+  li.className = 'item';
+  li.innerHTML = `<div class="icon">${ICON.book}</div>
+    <div class="meta"><div class="name"></div><div class="status">Waiting… · ${fmtSize(f.size)}</div>
+    <div class="bar"><i></i></div></div>`;
+  li.querySelector('.name').textContent = f.name;
+  list.prepend(li);
+  return li;
+}
+
+function setState(row, state, text) {
+  row.className = 'item ' + state;
+  row.querySelector('.icon').innerHTML = state === 'done' ? ICON.ok : state === 'error' ? ICON.err : ICON.spin;
+  row.querySelector('.status').textContent = text;
+  const bar = row.querySelector('.bar');
+  if (state === 'done' || state === 'error') bar.remove();
+  else bar.classList.toggle('busy', state === 'busy');
+}
+
+function convert(file, row) {
+  return new Promise(resolve => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('title', $('title').value);
+    fd.append('author', $('author').value);
+    fd.append('lang', $('lang').value);
+    fd.append('skip', $('skip').value);
+    const coverMode = document.querySelector('input[name=cover]:checked').value;
+    if (coverMode === 'image' && coverImage) fd.append('cover', coverImage);
+    fd.append('no_cover', coverMode === 'none' ? '1' : '');
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'convert');
+    xhr.responseType = 'blob';
+    setState(row, 'up', 'Uploading…');
+    xhr.upload.onprogress = e => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round(e.loaded / e.total * 100);
+      row.querySelector('.bar i').style.width = pct + '%';
+      row.querySelector('.status').textContent = `Uploading… ${pct}%`;
+      if (pct === 100) setState(row, 'busy', 'Converting… big books can take a minute');
+    };
+    xhr.upload.onload = () => setState(row, 'busy', 'Converting… big books can take a minute');
+    xhr.onload = async () => {
+      if (xhr.status === 200) {
+        const name = file.name.replace(/\.pdf$/i, '') + '.epub';
+        const url = URL.createObjectURL(xhr.response);
+        const summary = xhr.getResponseHeader('X-Summary');
+        setState(row, 'done', `Ready · ${fmtSize(xhr.response.size)}${summary ? ' · ' + summary : ''}`);
+        const a = document.createElement('a');
+        a.className = 'dl'; a.href = url; a.download = name; a.textContent = 'Download';
+        row.append(a);
+        a.click();
+      } else {
+        let msg = 'Conversion failed';
+        try { msg = JSON.parse(await xhr.response.text()).error || msg; } catch {}
+        if (xhr.status === 413) msg = 'File is too large (300 MB max)';
+        setState(row, 'error', msg);
+      }
+      resolve();
+    };
+    xhr.onerror = () => { setState(row, 'error', 'Could not reach the server'); resolve(); };
+    xhr.send(fd);
+  });
+}
+</script>
+</body>
+</html>

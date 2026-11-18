@@ -1,0 +1,9 @@
+services:
+  pdf2epub-web:
+    build: .
+    container_name: pdf2epub-web
+    ports:
+      - "8100:8000"     # open http://<this-machine's-IP>:8100 on your local network
+    volumes:
+      - ./pdf2epub.py:/app/pdf2epub.py:ro   # edit the converter without rebuilding
+    restart: unless-stopped
